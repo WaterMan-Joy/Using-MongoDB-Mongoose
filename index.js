@@ -8,7 +8,8 @@ const catchAsync = require('./utils/catchAsync');
 const ejsMate = require('ejs-mate');
 
 const Product = require('./models/product');
-const Farm = require('./models/farm')
+const Farm = require('./models/farm');
+const { accessSync } = require('fs');
 const categories = ['fruit', 'vegetable', 'dairy'];
 
 const app = express();
@@ -32,21 +33,26 @@ app.use(morgan('dev'))
 
 
 app.get('/farms', catchAsync(async (req, res, next) => {
-
     const farms = await Farm.find({});
+    if (!farms) {
+        throw new ExpressError('NOT FOUND A FARMS!');
+    }
     res.render('farms/index', { farms })
 }))
+
 app.get('/farms/new', (req, res) => {
     res.render('farms/new')
 })
-app.get('/farms/:id', async (req, res) => {
+
+app.get('/farms/:id', catchAsync(async (req, res, next) => {
     const farm = await Farm.findById(req.params.id).populate('products');
+    console.log(farm);
     res.render('farms/show', { farm })
-})
+}))
 
 app.delete('/farms/:id', async (req, res) => {
     const farm = await Farm.findByIdAndDelete(req.params.id);
-
+    console.log(farm);
     res.redirect('/farms');
 })
 
@@ -126,9 +132,15 @@ app.delete('/products/:id', async (req, res) => {
     res.redirect('/products');
 })
 
+const errorHandler = (err) => {
+    console.dir(err);
+    return new ExpressError(`ERR - ${err.name}, MESSAGE - ${err.message}, STATUS - ${err.status}`);
+}
+
 app.all('*', (req, res, next) => {
     next(new ExpressError('PAGE NOT FOUND!!', 404));
 })
+
 
 app.use((err, req, res, next) => {
     console.log('*************************************')
@@ -137,7 +149,13 @@ app.use((err, req, res, next) => {
     console.log('*************************************')
     console.log('*************************************')
     console.log(err.name)
-    res.render('')
+    if (err.name === "Error" || err.name === 'CastError' || err.name === 'ValidationError') {
+        err = errorHandler(err)
+    }
+    const { status = 500, message = 'SOMETHING WORNG!!' } = err;
+    res.status(status).render('error', {
+        status, message, err
+    });
 })
 
 
