@@ -3,6 +3,9 @@ const path = require('path');
 const mongoose = require('mongoose');
 const methodOverride = require('method-override');
 const morgan = require('morgan');
+const ExpressError = require('./utils/ExpressError');
+const catchAsync = require('./utils/catchAsync');
+const ejsMate = require('ejs-mate');
 
 const Product = require('./models/product');
 const Farm = require('./models/farm')
@@ -21,16 +24,18 @@ async function main() {
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 
+app.engine('ejs', ejsMate);
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride('_method'))
 app.use(morgan('dev'))
 
 
 
-app.get('/farms', async (req, res) => {
+app.get('/farms', catchAsync(async (req, res, next) => {
+
     const farms = await Farm.find({});
     res.render('farms/index', { farms })
-})
+}))
 app.get('/farms/new', (req, res) => {
     res.render('farms/new')
 })
@@ -121,8 +126,19 @@ app.delete('/products/:id', async (req, res) => {
     res.redirect('/products');
 })
 
+app.all('*', (req, res, next) => {
+    next(new ExpressError('PAGE NOT FOUND!!', 404));
+})
 
-
+app.use((err, req, res, next) => {
+    console.log('*************************************')
+    console.log('*************************************')
+    console.log('----------------ERROR----------------')
+    console.log('*************************************')
+    console.log('*************************************')
+    console.log(err.name)
+    res.render('')
+})
 
 
 app.listen(3000, () => {
