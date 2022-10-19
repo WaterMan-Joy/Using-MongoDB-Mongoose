@@ -31,6 +31,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride('_method'))
 app.use(morgan('dev'))
 
+
+// TODO:
 const validateFarmsAndProducts = (req, res, next) => {
     const { error } = farmsAndProductsSchema.validate(req.body);
     if (error) {
@@ -75,11 +77,11 @@ app.delete('/farms/:id', catchAsync(async (req, res, next) => {
 
 
 
-// app.post('/farms',  async (req, res) => {
-//     const farm = new Farm(req.body);
-//     await farm.save();
-//     res.redirect('/farms')
-// })
+app.post('/farms', catchAsync(async (req, res) => {
+    const farm = new Farm(req.body);
+    await farm.save();
+    res.redirect('/farms')
+}))
 
 app.get('/farms/:id/products/new', async (req, res) => {
     const { id } = req.params;
@@ -87,7 +89,8 @@ app.get('/farms/:id/products/new', async (req, res) => {
     res.render('products/new', { categories, farm })
 })
 
-app.post('/farms/:id/products', validateFarmsAndProducts, catchAsync(async (req, res, next) => {
+// FIXME:
+app.post('/farms/:id/products', catchAsync(async (req, res, next) => {
     const { id } = req.params;
     const farm = await Farm.findById(id);
     const { name, price, category } = req.body;
@@ -126,7 +129,7 @@ app.post('/products', validateFarmsAndProducts, catchAsync(async (req, res, next
 
 app.get('/products/:id', catchAsync(async (req, res, next) => {
     const { id } = req.params;
-    const product = await Product.findById(id).populate('farm', 'name');
+    const product = await Product.findById(id).populate('farm');
     if (!product) {
         throw next(new ExpressError('NOT FOUND PRODUCT ID!', 404))
     }
@@ -142,9 +145,11 @@ app.get('/products/:id/edit', catchAsync(async (req, res) => {
     res.render('products/edit', { product, categories })
 }))
 
+// FIXME: not put data!
 app.put('/products/:id', validateFarmsAndProducts, catchAsync(async (req, res, next) => {
     const { id } = req.params;
     const product = await Product.findByIdAndUpdate(id, req.body, { runValidators: true, new: true });
+    console.log(product)
     res.redirect(`/products/${product._id}`);
 }))
 
