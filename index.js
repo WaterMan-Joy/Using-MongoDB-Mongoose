@@ -6,10 +6,11 @@ const morgan = require('morgan');
 const ExpressError = require('./utils/ExpressError');
 const catchAsync = require('./utils/catchAsync');
 const ejsMate = require('ejs-mate');
-
 const Product = require('./models/product');
 const Farm = require('./models/farm');
 const { accessSync } = require('fs');
+const { farmsAndProductsSchema } = require('./schemas');
+
 const categories = ['fruit', 'vegetable', 'dairy'];
 
 const app = express();
@@ -30,12 +31,21 @@ app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride('_method'))
 app.use(morgan('dev'))
 
-
+const validateFarmsAndProducts = (req, res, next) => {
+    const { error } = farmsAndProductsSchema.validate(req.body);
+    if (error) {
+        const msg = error.details.map(el => el.message).join(',');
+        throw new ExpressError(msg, 400);
+    }
+    else {
+        next();
+    }
+}
 
 app.get('/farms', catchAsync(async (req, res, next) => {
     const farms = await Farm.find({});
     if (!farms) {
-        throw new ExpressError('NOT FOUND A FARMS!');
+        throw next(new ExpressError('NOT FOUND A FARMS!', 404));
     }
     res.render('farms/index', { farms })
 }))
@@ -46,24 +56,30 @@ app.get('/farms/new', (req, res) => {
 
 app.get('/farms/:id', catchAsync(async (req, res, next) => {
     const farm = await Farm.findById(req.params.id).populate('products');
+    if (!farm) {
+        throw next(new ExpressError('NOT FOUND FARMS ID!!', 404))
+    }
     console.log(farm);
     res.render('farms/show', { farm })
 }))
 
-app.delete('/farms/:id', async (req, res) => {
+app.delete('/farms/:id', catchAsync(async (req, res, next) => {
     const farm = await Farm.findByIdAndDelete(req.params.id);
+    if (!farm) {
+        throw next(new ExpressError('NOT FOUND DELETE FARMS ID!!', 404))
+    }
     console.log(farm);
     res.redirect('/farms');
-})
+}))
 
 
 
 
-app.post('/farms', async (req, res) => {
-    const farm = new Farm(req.body);
-    await farm.save();
-    res.redirect('/farms')
-})
+// app.post('/farms',  async (req, res) => {
+//     const farm = new Farm(req.body);
+//     await farm.save();
+//     res.redirect('/farms')
+// })
 
 app.get('/farms/:id/products/new', async (req, res) => {
     const { id } = req.params;
@@ -71,7 +87,7 @@ app.get('/farms/:id/products/new', async (req, res) => {
     res.render('products/new', { categories, farm })
 })
 
-app.post('/farms/:id/products', async (req, res) => {
+app.post('/farms/:id/products', validateFarmsAndProducts, catchAsync(async (req, res, next) => {
     const { id } = req.params;
     const farm = await Farm.findById(id);
     const { name, price, category } = req.body;
@@ -81,7 +97,7 @@ app.post('/farms/:id/products', async (req, res) => {
     await farm.save();
     await product.save();
     res.redirect(`/farms/${id}`)
-})
+}))
 
 
 
@@ -102,29 +118,35 @@ app.get('/products/new', (req, res) => {
     res.render('products/new', { categories })
 })
 
-app.post('/products', async (req, res) => {
+app.post('/products', validateFarmsAndProducts, catchAsync(async (req, res, next) => {
     const newProduct = new Product(req.body);
     await newProduct.save();
     res.redirect(`/products/${newProduct._id}`)
-})
+}))
 
-app.get('/products/:id', async (req, res) => {
+app.get('/products/:id', catchAsync(async (req, res, next) => {
     const { id } = req.params;
     const product = await Product.findById(id).populate('farm', 'name');
+    if (!product) {
+        throw next(new ExpressError('NOT FOUND PRODUCT ID!', 404))
+    }
     res.render('products/show', { product })
-})
+}))
 
-app.get('/products/:id/edit', async (req, res) => {
+app.get('/products/:id/edit', catchAsync(async (req, res) => {
     const { id } = req.params;
     const product = await Product.findById(id);
+    if (!product) {
+        throw next(new ExpressError('NOT FOUND PRODUCT EDIT PAGE!', 404))
+    }
     res.render('products/edit', { product, categories })
-})
+}))
 
-app.put('/products/:id', async (req, res) => {
+app.put('/products/:id', validateFarmsAndProducts, catchAsync(async (req, res, next) => {
     const { id } = req.params;
     const product = await Product.findByIdAndUpdate(id, req.body, { runValidators: true, new: true });
     res.redirect(`/products/${product._id}`);
-})
+}))
 
 app.delete('/products/:id', async (req, res) => {
     const { id } = req.params;
@@ -134,7 +156,7 @@ app.delete('/products/:id', async (req, res) => {
 
 const errorHandler = (err) => {
     console.dir(err);
-    return new ExpressError(`ERR - ${err.name}, MESSAGE - ${err.message}, STATUS - ${err.status}`);
+    return new ExpressError(`ERR - ${err.name}, MESSAGE - ${err.message}, STATUS - ${err.status}`, 400);
 }
 
 app.all('*', (req, res, next) => {
@@ -149,7 +171,7 @@ app.use((err, req, res, next) => {
     console.log('*************************************')
     console.log('*************************************')
     console.log(err.name)
-    if (err.name === "Error" || err.name === 'CastError' || err.name === 'ValidationError') {
+    if (err.name === "Error" || err.name === 'CastError' || err.name === 'validationError') {
         err = errorHandler(err)
     }
     const { status = 500, message = 'SOMETHING WORNG!!' } = err;
