@@ -40,8 +40,11 @@ app.use(session({
 }))
 app.use(flash());
 
+app.use((req, res, next) => {
+    res.locals.messages = req.flash('success');
+    next();
+})
 
-// TODO:
 const validateFarmsAndProducts = (req, res, next) => {
     const { error } = farmsAndProductsSchema.validate(req.body);
     if (error) {
@@ -53,6 +56,7 @@ const validateFarmsAndProducts = (req, res, next) => {
     }
 }
 
+// TODO: GET /FARMS
 app.get('/farms', catchAsync(async (req, res, next) => {
     const farms = await Farm.find({});
     if (!farms) {
@@ -61,10 +65,12 @@ app.get('/farms', catchAsync(async (req, res, next) => {
     res.render('farms/index', { farms })
 }))
 
+// TODO: GET /FAMRS/NEW
 app.get('/farms/new', (req, res) => {
     res.render('farms/new')
 })
 
+// TODO: GET /FARMS/:ID
 app.get('/farms/:id', catchAsync(async (req, res, next) => {
     const farm = await Farm.findById(req.params.id).populate('products');
     if (!farm) {
@@ -74,6 +80,7 @@ app.get('/farms/:id', catchAsync(async (req, res, next) => {
     res.render('farms/show', { farm })
 }))
 
+// TODO: DELETE /FARMS/:ID
 app.delete('/farms/:id', catchAsync(async (req, res, next) => {
     const farm = await Farm.findByIdAndDelete(req.params.id);
     if (!farm) {
@@ -83,20 +90,23 @@ app.delete('/farms/:id', catchAsync(async (req, res, next) => {
     res.redirect('/farms');
 }))
 
+// TODO: POST /FARMS
 app.post('/farms', validateFarmsAndProducts, catchAsync(async (req, res) => {
     const farm = new Farm(req.body);
     await farm.save();
+    req.flash('success', 'Successfully made a new farm!');
     res.redirect('/farms')
 }))
 
+// TODO: GET /FARMS/:ID/PRODUCTS/NEW
 app.get('/farms/:id/products/new', async (req, res) => {
     const { id } = req.params;
     const farm = await Farm.findById(id);
     res.render('products/new', { categories, farm })
 })
 
-// FIXME:
-app.post('/farms/:id/products', validateFarmsAndProducts, catchAsync(async (req, res, next) => {
+// TODO: POST /FARMS/:ID/PRODUCTS
+app.post('/farms/:id/products', validateFarmsAndProducts, catchAsync(async (req, res) => {
     const { id } = req.params;
     const farm = await Farm.findById(id);
     const { name, price, category } = req.body;
@@ -111,7 +121,7 @@ app.post('/farms/:id/products', validateFarmsAndProducts, catchAsync(async (req,
 
 
 // PRODUCT ROUTES
-
+// TODO: GET /PRODUCTS
 app.get('/products', async (req, res) => {
     const { category } = req.query;
     if (category) {
@@ -123,6 +133,8 @@ app.get('/products', async (req, res) => {
     }
 })
 
+// FIXME: 
+// TODO: GET /PRODUCTS/NEW
 app.get('/products/new', (req, res) => {
     res.render('products/new', { categories })
 })
@@ -151,7 +163,7 @@ app.get('/products/:id/edit', catchAsync(async (req, res) => {
     res.render('products/edit', { product, categories })
 }))
 
-// FIXME: not put data!
+
 app.put('/products/:id', validateFarmsAndProducts, catchAsync(async (req, res, next) => {
     const { id } = req.params;
     const product = await Product.findByIdAndUpdate(id, req.body, { runValidators: true, new: true });
