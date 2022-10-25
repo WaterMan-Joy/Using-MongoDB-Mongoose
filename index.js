@@ -10,6 +10,8 @@ const Product = require('./models/product');
 const Farm = require('./models/farm');
 const { accessSync } = require('fs');
 const { farmsAndProductsSchema } = require('./schemas');
+const session = require('express-session');
+const flash = require('connect-flash');
 
 const categories = ['fruit', 'vegetable', 'dairy'];
 
@@ -30,6 +32,13 @@ app.engine('ejs', ejsMate);
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride('_method'))
 app.use(morgan('dev'))
+
+app.use(session({
+    secret: 'mykey',
+    resave: false,
+    saveUninitialized: true,
+}))
+app.use(flash());
 
 
 // TODO:
@@ -74,10 +83,7 @@ app.delete('/farms/:id', catchAsync(async (req, res, next) => {
     res.redirect('/farms');
 }))
 
-
-
-
-app.post('/farms', catchAsync(async (req, res) => {
+app.post('/farms', validateFarmsAndProducts, catchAsync(async (req, res) => {
     const farm = new Farm(req.body);
     await farm.save();
     res.redirect('/farms')
@@ -90,7 +96,7 @@ app.get('/farms/:id/products/new', async (req, res) => {
 })
 
 // FIXME:
-app.post('/farms/:id/products', catchAsync(async (req, res, next) => {
+app.post('/farms/:id/products', validateFarmsAndProducts, catchAsync(async (req, res, next) => {
     const { id } = req.params;
     const farm = await Farm.findById(id);
     const { name, price, category } = req.body;
